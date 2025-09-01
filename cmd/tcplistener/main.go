@@ -26,9 +26,14 @@ func main() {
 		}
 
 		fmt.Println("Request line : ")
-		fmt.Println("request version: ", r.RequestLine.HttpVersion)
-		fmt.Println("request method: ", r.RequestLine.Method)
-		fmt.Println("request target: ", r.RequestLine.RequestTarget)
-
+		fmt.Println("- Version: ", r.RequestLine.HttpVersion)
+		fmt.Println("- Method: ", r.RequestLine.Method)
+		fmt.Println("- Target: ", r.RequestLine.RequestTarget)
+		fmt.Println("Headers: ")
+		for key, value := range r.Headers {
+			fmt.Printf("- %s: %s\n", key, value)
+		}
+		fmt.Println("Body: ")
+		fmt.Println(string(r.Body))
 	}
 }

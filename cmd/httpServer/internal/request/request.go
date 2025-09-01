@@ -2,7 +2,7 @@ package request
 
 import (
 	"fmt"
-	"httpServer/cmd/tcplistener/internal/headers"
+	"httpServer/cmd/httpServer/internal/headers"
 	"io"
 	"strconv"
 	"strings"
@@ -69,7 +69,6 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	}
 
 	bodySize, _ := strconv.Atoi(request.Headers["content-length"])
-	println("body  size", bodySize)
 	if len(request.Body) != bodySize {
 		return nil, ERROR_PARTIAL_CONTENT
 	}
