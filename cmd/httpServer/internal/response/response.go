@@ -1,56 +1,80 @@
 package response
 
 import (
+	"bytes"
 	"fmt"
 	"httpServer/cmd/httpServer/internal/headers"
-	"io"
 	"strconv"
 )
 
 type StatusCode int
+type WriterState string
 
+const (
+	InitState              WriterState = "init"
+	StatusLineStateWritten WriterState = "status_line"
+	HeadersStateWritten    WriterState = "headers"
+	BodyStateWritten       WriterState = "body"
+)
 const (
 	Ok                  StatusCode = 200
 	BadRequest          StatusCode = 400
 	InternalServerError StatusCode = 500
 )
 
+type Writer struct {
+	state  WriterState
+	buffer bytes.Buffer
+}
+
+var ERROR_STATUS_LINE_STATE = fmt.Errorf("Status code already written or wrong order")
+var ERROR_BODY_STATE = fmt.Errorf("Must write headers before body")
+var ERROR_HEADERS_STATE = fmt.Errorf("Must write status line before headers")
+
 const CRLF string = "\r\n"
 
-func WriteStatusLine(w io.Writer, statusCode StatusCode) error {
+func (writer *Writer) WriteStatusLine(statusCode StatusCode) error {
+	if writer.state != InitState {
+		return ERROR_STATUS_LINE_STATE
+	}
 	httpStatusText := httpStatusText(statusCode)
 	startLine := fmt.Sprintf("HTTP/1.1 %d %s %s", statusCode, httpStatusText, CRLF)
-	_, err := w.Write([]byte(startLine))
+	_, err := writer.buffer.Write([]byte(startLine))
 	if err != nil {
 		return err
 	}
+	writer.state = StatusLineStateWritten
 	return nil
 }
 
-func httpStatusText(StatusCode StatusCode) string {
-	switch StatusCode {
-	case Ok:
-		return "ok"
-	case BadRequest:
-		return "Bad Request"
-	case InternalServerError:
-		return "Internal Server Error"
+func (writer *Writer) WriteHeaders(headers headers.Headers) error {
+	if writer.state != StatusLineStateWritten {
+		return ERROR_HEADERS_STATE
 	}
-	return ""
-}
-
-func WriteHeaders(w io.Writer, headers headers.Headers) error {
 	for key, value := range headers {
 		fieldLine := getFieldLine(key, value)
-		_, err := w.Write([]byte(fieldLine))
+		_, err := writer.buffer.Write([]byte(fieldLine))
 		if err != nil {
 			return err
 		}
 	}
-	_, err := w.Write([]byte(CRLF))
+	_, err := writer.buffer.Write([]byte(CRLF))
 	if err != nil {
 		return err
 	}
+	writer.state = HeadersStateWritten
+	return nil
+}
+
+func (writer *Writer) WriteBody(body []byte) error {
+	if writer.state != HeadersStateWritten {
+		return ERROR_BODY_STATE
+	}
+	_, err := writer.buffer.Write(body)
+	if err != nil {
+		return err
+	}
+	writer.state = BodyStateWritten
 	return nil
 }
 
@@ -63,5 +87,26 @@ func GetDefaultHeaders(contentLen int) headers.Headers {
 }
 
 func getFieldLine(key string, value string) string {
-	return fmt.Sprintf("%s: %s %s", key, value, CRLF)
+	return fmt.Sprintf("%s: %s%s", key, value, CRLF)
+}
+
+func NewWriter() *Writer {
+	return &Writer{
+		state: InitState,
+	}
+}
+func httpStatusText(StatusCode StatusCode) string {
+	switch StatusCode {
+	case Ok:
+		return "ok"
+	case BadRequest:
+		return "Bad Request"
+	case InternalServerError:
+		return "Internal Server Error"
+	}
+	return ""
+}
+
+func (writer *Writer) GetBuffer() []byte {
+	return writer.buffer.Bytes()
 }

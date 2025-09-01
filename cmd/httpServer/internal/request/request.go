@@ -41,6 +41,13 @@ var ERROR_PARTIAL_CONTENT = fmt.Errorf("Partial Content")
 
 var SEPARATOR string = "\r\n"
 
+// statusLine: Method(Get, Post) path(/login) http/version(1.1) \r\n
+// headers: Content-Type: text/html \r\n
+// cookies:  token, token
+// Content-Length: 123
+// \n\r
+// body
+
 func RequestFromReader(reader io.Reader) (*Request, error) {
 	request := newRequest()
 	readtToIndex := 0
@@ -74,6 +81,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	}
 	return request, nil
 }
+
 func (r *Request) parseSingleLine(data []byte) (int, error) {
 	switch r.state {
 	case StateInit:

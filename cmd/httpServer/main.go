@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"httpServer/cmd/httpServer/internal/headers"
 	"httpServer/cmd/httpServer/internal/request"
+	"httpServer/cmd/httpServer/internal/response"
 	"httpServer/cmd/httpServer/server"
-	"io"
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 )
 
@@ -27,14 +29,25 @@ func printRequest(r *request.Request) {
 	fmt.Println()
 }
 
-func handler(w io.Writer, req *request.Request) *server.HandlerError {
-	printRequest(req)
-	w.Write([]byte("All good, frfr\n"))
-	return nil
-	return &server.HandlerError{
-		StatusCode: 500,
-		Message:    "Woopsie, my bad\n",
+func handler(w *response.Writer, req *request.Request) {
+	w.WriteStatusLine(200)
+	newHeaders := headers.NewHeaders()
+	// newHeaders["Content-Type"] = "text/html"
+	fmt.Println("Method: ", req.RequestLine.Method)
+	fmt.Println("Method: ", req.RequestLine.RequestTarget)
+	newHeaders["Content-Type"] = "application/json"
+	data, err := os.ReadFile("./test.json")
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
+	newHeaders["Content-Length"] = strconv.Itoa(len(data))
+	err = w.WriteHeaders(newHeaders)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	w.WriteBody(data)
 }
 
 func main() {
