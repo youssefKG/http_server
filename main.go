@@ -1,120 +1,65 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"net"
-	"strings"
-	"unicode"
+	"httpServer/cmd/httpServer/internal/headers"
+	"httpServer/cmd/httpServer/internal/request"
+	"httpServer/cmd/httpServer/internal/response"
+	"httpServer/cmd/httpServer/server"
+	"log"
+	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
 )
 
-func getLinesChannel(c net.Conn) <-chan string {
-	out := make(chan string, 1)
+const port = 42069
 
-	go func() {
-		defer close(out)
-		defer c.Close()
-		var data strings.Builder
-		buffer := make([]byte, 8)
-		for {
-			readedByte, err := c.Read(buffer)
-			if err != nil {
-				break
-			}
-			data.WriteString(string(buffer[:readedByte]))
-		}
-		stringParts := strings.Split(data.String(), "\n")
-		for _, s := range stringParts {
-			if s != "" {
-				out <- s
-			}
-		}
-	}()
-	return out
+func printRequest(r *request.Request) {
+	fmt.Printf(
+		"%s %s %s\n",
+		r.RequestLine.Method,
+		r.RequestLine.RequestTarget,
+		r.RequestLine.HttpVersion)
+	for key, value := range r.Headers {
+		fmt.Printf("%s: %s\n", key, value)
+	}
+	fmt.Println()
+	fmt.Println(string(r.Body))
+	fmt.Println()
 }
 
-// func main() {
-// 	listener, err := net.Listen("tcp", ":42069")
-//
-// 	if err != nil {
-// 		fmt.Print("connection error", err)
-// 		return
-// 	}
-//
-// 	for {
-// 		conn, err := listener.Accept()
-// 		if err != nil {
-// 			fmt.Print("connect errro", err)
-// 			return
-// 		}
-// 		lines := getLinesChannel(conn)
-//
-// 		for line := range lines {
-// 			fmt.Printf("%s\n", line)
-// 		}
-// 	}
-// }
-
-// func formatValue(data []byte) ([]byte, error) {
-// 	whiteSpacesAtStart := 0
-// 	whitesSpacesAtEnd := 0
-// 	dataLen := len(data)
-// 	for whiteSpacesAtStart < dataLen &&
-// 		unicode.IsSpace(rune(data[whiteSpacesAtStart])) {
-// 		whiteSpacesAtStart++
-// 	}
-// 	for whitesSpacesAtEnd < dataLen-whiteSpacesAtStart &&
-// 		unicode.IsSpace(rune(data[dataLen-1-whitesSpacesAtEnd])) {
-// 		whitesSpacesAtEnd++
-// 	}
-// 	return data[whiteSpacesAtStart : len(data)-whitesSpacesAtEnd], nil
-// }
-//
-// func main() {
-// 	value, err := formatValue([]byte("localhost:42069\r\n\r\n"))
-// 	if err != nil {
-// 		fmt.Println("error occured")
-// 		return
-// 	}
-// 	fmt.Println(string(value))
-// }
-
-var Invalid_Key_Format = fmt.Errorf("Invalid key format")
-
-func formatKey(data []byte) ([]byte, error) {
-	whiteSpacesAtStart := 0
-	dataLen := len(data)
-	for whiteSpacesAtStart < dataLen &&
-		unicode.IsSpace(rune(data[whiteSpacesAtStart])) {
-		whiteSpacesAtStart++
-	}
-	fmt.Println("hello", string(data))
-	if whiteSpacesAtStart == dataLen {
-		return nil, Invalid_Key_Format
-	}
-
-	key := data[whiteSpacesAtStart:]
-	if len(key) < 1 {
-		return nil, Invalid_Key_Format
-	}
-	for _, c := range key {
-		if unicode.IsSpace(rune(c)) {
-			return nil, Invalid_Key_Format
-		}
-	}
-	return data[whiteSpacesAtStart:], nil
-}
-func main() {
-	header := []byte("Host: localhost:42069\r\n\r\n")
-	colonIdx := bytes.Index(header, []byte(":"))
-	if colonIdx == -1 {
-		return
-	}
-
-	key, err := formatKey(header[:colonIdx])
+func handler(w *response.Writer, req *request.Request) {
+	w.WriteStatusLine(200)
+	newHeaders := headers.NewHeaders()
+	// newHeaders["Content-Type"] = "text/html"
+	fmt.Println("Method: ", req.RequestLine.Method)
+	fmt.Println("Method: ", req.RequestLine.RequestTarget)
+	newHeaders["Content-Type"] = "application/json"
+	data, err := os.ReadFile("./test.json")
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(string(key))
+	newHeaders["Content-Length"] = strconv.Itoa(len(data))
+	err = w.WriteHeaders(newHeaders)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	w.WriteBody(data)
+}
+
+func main() {
+	server, err := server.Serve(port, handler)
+	if err != nil {
+		log.Fatalf("Error starting server: %v", err)
+	}
+	defer server.Close()
+	log.Println("Server started on port", port)
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
+	log.Println("Server gracefully stopped")
 }
