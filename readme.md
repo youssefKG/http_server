@@ -1,9 +1,3 @@
-Great 👍 Thanks for sharing the code. From what I see, you’re building a **basic HTTP server in Go** with custom implementations for **request parsing, response writing, and headers management**.
-
-Here’s a first draft of a **README.md** you can put on GitHub:
-
----
-
 # HTTP Server in Go
 
 A lightweight custom HTTP server implemented in Go.
